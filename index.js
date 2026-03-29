@@ -4,7 +4,6 @@ app.use(express.json());
 
 const VERIFY_TOKEN = 'redinvest123';
 
-// Webhook verification
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -16,7 +15,6 @@ app.get('/webhook', (req, res) => {
   }
 });
 
-// Receive messages
 app.post('/webhook', async (req, res) => {
   const body = req.body;
   if (body.object === 'whatsapp_business_account') {
@@ -28,10 +26,8 @@ app.post('/webhook', async (req, res) => {
       const text = message?.text?.body || '';
       console.log(`Message from ${from}: ${text}`);
 
-      // Auto reply
       await sendMessage(from, `Ողջույն, բարի գալուստ RedInvest։ Ծանոթացե՛ք մեր նախագծերին՝ https://redinvest.am`);
-
-      // TODO: Bitrix24 lead creation will be added here
+      await createBitrixLead(from, text);
     }
   }
   res.sendStatus(200);
@@ -57,6 +53,25 @@ async function sendMessage(to, text) {
   );
   const data = await response.json();
   console.log('Sent:', JSON.stringify(data));
+}
+
+async function createBitrixLead(phone, message) {
+  const fetch = (await import('node-fetch')).default;
+  const url = `${process.env.BITRIX_WEBHOOK}crm.lead.add.json`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        TITLE: `WhatsApp Lead - ${phone}`,
+        PHONE: [{ VALUE: phone, VALUE_TYPE: 'WORK' }],
+        COMMENTS: `First message: ${message}`,
+        SOURCE_ID: 'WEB',
+      }
+    }),
+  });
+  const data = await response.json();
+  console.log('Bitrix lead:', JSON.stringify(data));
 }
 
 const PORT = process.env.PORT || 3000;
